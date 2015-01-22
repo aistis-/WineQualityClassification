@@ -4,12 +4,8 @@ println <- function(...) {
 }
 
 # Read red wines data set to a table
-redWines = read.csv(file="data_set/red_wines.csv", sep=";")
-whiteWines = read.csv(file="data_set/red_wines.csv", sep=";")
-
-# Data set for the script. Red or white wines
-data = redWines
-#data = whiteWines
+data = read.csv(file="data_set/white_wines.csv", sep=";")
+#data = read.csv(file="data_set/red_wines.csv", sep=";")
 
 println("Number of attributes: ", ncol(data))
 
@@ -34,7 +30,6 @@ for(i in 1:ncol(dataValues)) {
   println();
 }
 
-
 # Let's check if there any dupliocated entries
 anyDuplicated(data)
 
@@ -48,44 +43,55 @@ data = unique(data)
 # Is there still any duplicants?
 anyDuplicated(data)
 
-# 1-11 attributes are the main values for classification
-dataValues = data[,1:11]
-
-# The 12th attribute is our targeted quality value
-dataTarget = data[,12]
-
 # Margins to make the labes visible
 par(mar=c(8,3,1,1))
 # Box-and-Whisker plot
-boxplot(dataValues, las=2)
+boxplot(data[,1:11], las=2)
 
 # Let's investigate data correlation
-plot(dataValues)
-round(cor(dataValues), digits=3)
+plot(data[,1:11])
+round(cor(data[,1:11]), digits=3)
 
 # Covariance
-round(cov(dataValues), digits=3)
-
-# Standard Deviation Matrix
-std = vector(length = ncol(dataValues))
-
-for (i in 1:ncol(dataValues))
-  std[i] = sd(dataValues[,i])
-
-# There there are only weak correlation between 
-# fixed.acidity and citric.acid 0.672
-# fixed.acidity and density 0.668
-# fixed.acidity and pH -0.683
+round(cov(data[,1:11]), digits=3)
 
 # install.packages('e1071', dependencies = TRUE)
 library(e1071)
-svm <- svm(dataValues)
 
-res = predict(svm, dataValues[,1:11])
-cm_iris = table(res, dataValues[,12])
+trainPercentage = 50
+
+println(trainPercentage, "percent of total", nrow(data), "rows will be used for train data")
+
+dataTrain = sample(1:nrow(data), round(nrow(data) * 30 / 100))
+dataTest = setdiff(1:nrow(data), dataTrain)
+
+SVM = svm(data[dataTrain, 1:11], data[dataTrain, 12])
+
+result = predict(SVM, data[dataTest, 1:11])
+result = round(result)
+
+processedData = table(factor(result, levels = 1:10), factor(data[dataTest, 12], levels = 1:10))
 
 correct = 0
-for (i in 1:ncol(data))
-  correct = correct + cm_iris[i, i]
+for (i in 1:ncol(processedData))
+  correct = correct + processedData[i, i]
 
-accuracy = correct / sum(dataTarget)
+accuracy = correct / sum(processedData)
+
+println("Calculated accuracy with SVM is", accuracy)
+
+bayes = naiveBayes(data[dataTrain, 1:11], data[dataTrain, 12])
+
+result = predict(bayes, data[dataTest, 1:11])
+
+# compute accuracy
+processedData = table(factor(result, levels = 1:10), factor(data[dataTest, 12], levels = 1:10))
+
+
+correct = 0
+for (i in 1:ncol(processedData))
+  correct = correct + processedData[i, i]
+
+accuracy = correct / sum(processedData)
+
+println("Calculated accuracy with Bayes is", accuracy)
