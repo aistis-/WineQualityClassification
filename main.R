@@ -4,8 +4,8 @@ println <- function(...) {
 }
 
 # Read red wines data set to a table
-#data = read.csv(file="data_set/white_wines.csv", sep=";")
-data = read.csv(file="data_set/red_wines.csv", sep=";")
+data = read.csv(file="data_set/white_wines.csv", sep=";")
+#data = read.csv(file="data_set/red_wines.csv", sep=";")
 
 println("Number of attributes: ", ncol(data))
 
@@ -39,9 +39,6 @@ boxplot(data[,1:11], las=2)
 plot(data[,1:11])
 round(cor(data[,1:11]), digits=3)
 
-# Covariance
-round(cov(data[,1:11]), digits=3)
-
 # Let's check if there any duplicated entries
 anyDuplicated(data)
 
@@ -57,62 +54,81 @@ anyDuplicated(data)
 
 # install.packages('e1071', dependencies = TRUE)
 library(e1071)
+library(matrixStats)
 
-trainPercentage = 20
-println(trainPercentage, "percent of total", nrow(data), "rows will be used for train data")
+# dataStandardized = scale(as.matrix(data), TRUE, TRUE)
+# dataStandardized = sweep(dataStandardized, 2, colSds(as.matrix(data[1:12])), "*")
+# dataStandardized = sweep(dataStandardized, 2, colMeans(data[1:12]), "+")
+# data = dataStandardized
 
-# The prediction will be repeated 5 times with randomly diferent training and testing data
-for (k in 1:5) {
-  dataTrain = sample(1:nrow(data), round(nrow(data) * 30 / 100))
-  dataTest = setdiff(1:nrow(data), dataTrain)
-  
-  SVM = svm(data[dataTrain, 1:11], data[dataTrain, 12], tolerance = 0.25, type = "C-classification")
-  
-  result = predict(SVM, data[dataTest, 1:11])
-  
-  processedData = table(factor(result, levels = 1:10), factor(data[dataTest, 12], levels = 1:10))
-  
-  correct = 0
-  for (i in 1:ncol(processedData))
-    correct = correct + processedData[i, i]
-  
-  accuracy = correct / sum(processedData)
-  
-  println("Calculated strict accuracy with SVM is", accuracy)
-  
-  # Actual test set quality - predicted quality
-  mismatch = data[dataTest, 12] - strtoi(result)
-  
-  # Count accuracy taking into account that +- 1 is still acceptable
-  accuracy = length(which(abs(mismatch) <= 1)) / length(mismatch)
-  
-  println("Calculated one-neighbor accuracy with SVM is", accuracy)
-}
+confusionMatrix = matrix(0, 10, 10)
 
 # The prediction will be repeated 5 times with randomly diferent training and testing data
 for (k in 1:5) {
-  dataTrain = sample(1:nrow(data), round(nrow(data) * 30 / 100))
-  dataTest = setdiff(1:nrow(data), dataTrain)
+  from = round(nrow(data) / 5 * (k-1)) + 1
+  to = round(nrow(data) / 5 * k)
   
-  bayes = naiveBayes(data[dataTrain, 1:11], as.factor(data[dataTrain, 12]))
+  SVM = svm(data[-(from:to), 1:11], data[-(from:to), 12], type = "C-classification")
   
-  result = predict(bayes, data[dataTest, 1:11])
+  result = predict(SVM, data[from:to, 1:11])
   
-  processedData = table(factor(result, levels = 1:10), factor(data[dataTest, 12], levels = 1:10))
-  
-  correct = 0
-  for (i in 1:ncol(processedData))
-    correct = correct + processedData[i, i]
-  
-  accuracy = correct / sum(processedData)
-  
-  println("Calculated strict accuracy with Bayes is", accuracy)
-  
-  # Actual test set quality - predicted quality
-  mismatch = data[dataTest, 12] - strtoi(result)
-  
-  # Count accuracy taking into account that +- 1 is still acceptable
-  accuracy = length(which(abs(mismatch) <= 1)) / length(mismatch)
-  
-  println("Calculated one-neighbor accuracy with Bayes is", accuracy)
+  confusionMatrix = confusionMatrix + table(factor(result, levels = 1:10), factor(data[from:to, 12], levels = 1:10))
 }
+
+correct = 0
+for (i in 1:ncol(confusionMatrix))
+  correct = correct + confusionMatrix[i, i]
+
+# Strict accuracy
+accuracyStrict = correct / sum(confusionMatrix)
+
+# Actual test set quality - predicted quality
+mismatch = data[from:to, 12] - strtoi(result)
+
+# Count accuracy taking into account that +- 1 is still acceptable
+accuracyNeighbotStrict = length(which(abs(mismatch) <= 1)) / length(mismatch)
+
+# Mean Absolute Error
+mae = sum(abs(data[from:to, 12] - strtoi(result)))/length(mismatch)
+
+println("Calculated strict accuracy with SVM is", accuracyStrict)
+println("Calculated one-neighbor accuracy with SVM is", accuracyNeighbotStrict)
+println("Calculated MAE with SVM is", mae)
+
+confusionMatrix
+
+confusionMatrix = matrix(0, 10, 10)
+
+# The prediction will be repeated 5 times with randomly diferent training and testing data
+for (k in 1:5) {
+  from = round(nrow(data) / 5 * (k-1)) + 1
+  to = round(nrow(data) / 5 * k)
+  
+  bayes = naiveBayes(data[-(from:to), 1:11], as.factor(data[-(from:to), 12]))
+  
+  result = predict(bayes, data[from:to, 1:11])
+  
+  confusionMatrix = confusionMatrix + table(factor(result, levels = 1:10), factor(data[from:to, 12], levels = 1:10))
+}
+
+correct = 0
+for (i in 1:ncol(confusionMatrix))
+  correct = correct + confusionMatrix[i, i]
+
+# Strict accuracy
+accuracyStrict = correct / sum(confusionMatrix)
+
+# Actual test set quality - predicted quality
+mismatch = data[from:to, 12] - strtoi(result)
+
+# Count accuracy taking into account that +- 1 is still acceptable
+accuracyNeighbotStrict = length(which(abs(mismatch) <= 1)) / length(mismatch)
+
+# Mean Absolute Error
+mae = sum(abs(data[from:to, 12] - strtoi(result)))/length(mismatch)
+
+println("Calculated strict accuracy with Bayes is", accuracyStrict)
+println("Calculated one-neighbor accuracy with Bayes is", accuracyNeighbotStrict)
+println("Calculated MAE with Bayes is", mae)
+
+confusionMatrix
